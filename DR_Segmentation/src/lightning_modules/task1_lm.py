@@ -13,9 +13,12 @@ from .losses.focal_loss import FocalLossMultiLabel
 
 
 class Task1LM(LightningModule):
-    def __init__(self, lr, backbone, num_classes=3, target=2, epochs=500):
+    def __init__(self, lr, backbone, num_classes=3, target=2, epochs=500, reg_type="none", reg_weight=0.0):
         super().__init__()
         self.save_hyperparameters()
+        self.reg_type = reg_type
+        self.reg_weight = float(reg_weight)
+
         
         self.model = get_drac_model('segment', backbone, num_classes)
         
@@ -36,19 +39,56 @@ class Task1LM(LightningModule):
     
     def step(self, batch, split='train', batch_idx=None):
         imgs, labels = batch
-        batch_size = imgs.size(0)
         ds = self.model(imgs)
+    
+        # ----------------------------
+        # Loss base (original)
+        # ----------------------------
         if self.target == 2:
-            focal_loss_1 = self.aux_criterion(ds[0][:, 0], labels[:, 0]) 
-            focal_loss_2 = self.aux_criterion(ds[0][:, 1], labels[:, 1]) 
+            focal_loss_1 = self.aux_criterion(ds[0][:, 0], labels[:, 0])
+            focal_loss_2 = self.aux_criterion(ds[0][:, 1], labels[:, 1])
             focal_loss_3 = self.aux_criterion(ds[0][:, 2], labels[:, 2])
             dice_loss = self.criterion(ds[0], labels)
-            loss = 0.5 * (focal_loss_1 + focal_loss_2 + focal_loss_3) + dice_loss
+            base_loss = 0.5 * (focal_loss_1 + focal_loss_2 + focal_loss_3) + dice_loss
         else:
-            loss = 0.5 * self.aux_criterion(ds[0], labels) + self.criterion(ds[0], labels)
+            base_loss = 0.5 * self.aux_criterion(ds[0], labels) + self.criterion(ds[0], labels)
+    
+        # métricas (não mudam)
         self.update_metrics(torch.sigmoid(ds[0]), labels.long(), split)
-        self.log(f'{split}/loss', loss)
+    
+        # ----------------------------
+        # Regularização (corrigida)
+        # ----------------------------
+        reg_loss = torch.tensor(0.0, device=base_loss.device)
+    
+        if self.reg_type == "l2" and self.reg_weight > 0:
+            sq_sum = torch.tensor(0.0, device=base_loss.device)
+            n = 0
+            for p in self.model.parameters():
+                sq_sum = sq_sum + torch.sum(p ** 2)
+                n += p.numel()
+            reg_loss = sq_sum / max(n, 1)  # normaliza pela quantidade de parâmetros
+    
+        elif self.reg_type == "tv" and self.reg_weight > 0:
+            # TV nos logits (ds[0]) -> suaviza o mapa predito
+            logits = ds[0]
+            dx = torch.mean(torch.abs(logits[:, :, :, 1:] - logits[:, :, :, :-1]))
+            dy = torch.mean(torch.abs(logits[:, :, 1:, :] - logits[:, :, :-1, :]))
+            reg_loss = dx + dy
+    
+        # loss final (a que o otimizador minimiza)
+        loss = base_loss + self.reg_weight * reg_loss
+    
+        # ----------------------------
+        # Logs (agora consistentes)
+        # ----------------------------
+        self.log(f'{split}/loss', loss, prog_bar=True)
+        self.log(f'{split}/base_loss', base_loss, prog_bar=False)
+        self.log(f"{split}/reg_loss", reg_loss, prog_bar=False)
+        self.log(f"{split}/reg_weight", float(self.reg_weight), prog_bar=False)
+    
         return loss
+
     
     def training_step(self, batch, batch_idx):
         return self.step(batch, split='train', batch_idx=batch_idx)
