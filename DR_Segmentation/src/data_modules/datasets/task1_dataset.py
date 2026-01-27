@@ -43,7 +43,7 @@ class Task1Dataset(Dataset):
                 assert (np.unique(mask) == [0, 255]).all(), np.unique(mask)
                 lbl.append(mask/255.)
             else:
-                lbl.append(np.zeros((1024,1024),np.float))
+                lbl.append(np.zeros((1024,1024),np.float32))
         
         if self.transform is not None:
             aug = self.transform(image=img, mask=lbl[0], mask1=lbl[1], mask2=lbl[2])
@@ -117,7 +117,7 @@ class Task1Dataset2(Dataset):
                 assert (np.unique(mask) == [0, 255]).all(), np.unique(mask)
                 lbl.append(mask/255.)
             else:
-                lbl.append(np.zeros((1024, 1024),np.float))
+                lbl.append(np.zeros((1024, 1024),np.float32))
         
         if self.transform is not None:
             aug = self.transform(image=img, mask=lbl[0], mask1=pl_mask)
@@ -197,7 +197,7 @@ class Task1Dataset2(Dataset):
 #                     assert (np.unique(mask) == [0, 255]).all(), np.unique(mask)
 #                     lbl.append(mask/255.)
 #                 else:
-#                     lbl.append(np.zeros((1024,1024),np.float))
+#                     lbl.append(np.zeros((1024,1024),np.float32))
             
 #             if self.transform is not None:
 #                 aug = self.transform(image=img, mask=lbl[0], mask1=lbl[1], mask2=lbl[2])
@@ -283,7 +283,7 @@ class Task1Dataset2(Dataset):
 #                     assert (np.unique(mask) == [0, 255]).all(), np.unique(mask)
 #                     lbl.append(mask/255.)
 #                 else:
-#                     lbl.append(np.zeros((1024,1024),np.float))
+#                     lbl.append(np.zeros((1024,1024),np.float32))
             
 #             if self.transform is not None:
 #                 aug = self.transform(image=img, mask=lbl[0], mask1=lbl[1], mask2=lbl[2])
