@@ -305,13 +305,13 @@ class Task1LM2(LightningModule):
     def training_step(self, batch, batch_idx):
         return self.step(batch, split='train', batch_idx=batch_idx)
     
-    def training_epoch_end(self, outputs):
+    def on_train_epoch_end(self):
         self.compute_metrics(split='train')
     
     def validation_step(self, batch, batch_idx):
         self.step(batch, split='val', batch_idx=batch_idx)
     
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         self.compute_metrics(split='val')
     
     def configure_optimizers(self):
