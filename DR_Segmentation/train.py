@@ -3,7 +3,6 @@ import numpy as np
 import argparse
 
 from pytorch_lightning import Trainer, loggers
-from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, StochasticWeightAveraging
 
 from src.data_modules.task1_dm import Task1DM
@@ -77,12 +76,12 @@ def run(conf):
     trainer = Trainer(logger=tb_logger, 
                       callbacks=[ckpt_callback, ckpt_callback1, ckpt_callback2, ckpt_callback3, lr_callback],
                       default_root_dir=conf.save_dir,
-                      devices=1, #[int(x) for x in conf.gpu_id.split(',')],
+                      devices=len(conf.gpu_id.split(',')) if len(conf.gpu_id.split(',')) > 1 else 1,
                       max_epochs=conf.max_epochs,
                       log_every_n_steps=1,
                       accelerator='gpu',
-                      strategy=DDPPlugin(find_unused_parameters=True) if len(conf.gpu_id.split(',')) > 1 else None,
-                      precision=16,
+                      strategy="ddp_find_unused_parameters_true" if len(conf.gpu_id.split(',')) > 1 else "auto",
+                      precision="16-mixed",
                       sync_batchnorm=True if len(conf.gpu_id.split(',')) > 1 else False,
                       num_sanity_val_steps=0,
                       )
@@ -113,6 +112,10 @@ def parse_argument():
     #parser.add_argument('--loss', type=str, default='ce', choices=['ce', 'focal', 'mse', 'smoothl1', 'ls', 'qwk', 'qwk2'])
     parser.add_argument('--lr', type=float, default=2e-4)
     parser.add_argument('--optimizer', type=str, default='adamw', choices=['adam', 'adamw', 'sgd', 'radam'])
+    # Regularization
+    parser.add_argument('--reg_type', type=str, default='none', choices=['none', 'l2'])
+    parser.add_argument('--reg_weight', type=float, default=0.0)
+
     
     # Trainer Parameters
     parser.add_argument('--gpu_id', type=str, default='1')
