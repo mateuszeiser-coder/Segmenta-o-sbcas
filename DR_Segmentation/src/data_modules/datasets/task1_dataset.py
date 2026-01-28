@@ -30,7 +30,7 @@ class Task1Dataset(Dataset):
         
         # image
         filename = info['filename']
-        img_path = os.path.join(self.data_dir, self.task_tag, '1. Original Images', 'a. Training Set', filename)
+        img_path = os.path.join(self.data_dir, '1. Original Images', 'a. Training Set', filename)
         img = cv2.imread(img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -65,7 +65,7 @@ class Task1Dataset2(Dataset):
         self.data_dir = data_dir
         self.transform = transform
         
-        self.task_tag = 'A. Segmentation'
+        #self.task_tag = 'A. Segmentation'
         df = pd.read_csv(os.path.join(data_dir, 'segmentation_split.csv'))
         self.df = df
         #self.df = df[df['split'] == split]
@@ -113,6 +113,7 @@ class Task1Dataset2(Dataset):
         lbl = []
         for c in self.label_name[self.target]:
             lbl_path = os.path.join(self.data_dir, '2. Groundtruths','a. Training Set', c, filename)
+            #lbl_path = os.path.join(self.data_dir, '2. Groundtruths','a. Training Set', c, filename)
 
             if os.path.exists(lbl_path):
                 mask = cv2.imread(lbl_path)
