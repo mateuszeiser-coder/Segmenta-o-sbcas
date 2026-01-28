@@ -53,6 +53,10 @@ class Task1Dataset(Dataset):
             lbl[0] = aug['mask']
             lbl[1] = aug['mask1']
             lbl[2] = aug['mask2']
+            lbl = [torch.as_tensor(m) if not torch.is_tensor(m) else m for m in lbl]
+            lbl = [m.float() for m in lbl]
+            lbl = torch.stack(lbl)
+
         lbl = torch.stack(lbl)
         #print(img.size())
         return img, lbl
