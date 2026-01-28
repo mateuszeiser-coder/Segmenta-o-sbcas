@@ -40,7 +40,8 @@ from src.utils import set_seed
 
 def run(conf):
     dm = Task1DM('segment', conf.data_dir, conf.input_size, conf.batch_size, conf.num_workers, conf.balanced_sampling, conf.target)
-    lm = Task1LM(conf.lr, conf.backbone, target=conf.target)
+    lm = Task1LM(conf.lr, conf.backbone, target=conf.target, reg_type=conf.reg_type, reg_weight=conf.reg_weight)
+
     tb_logger = loggers.TensorBoardLogger(save_dir=conf.save_dir)
 
     ckpt_callback = ModelCheckpoint(
