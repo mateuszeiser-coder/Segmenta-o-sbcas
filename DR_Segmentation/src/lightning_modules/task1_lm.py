@@ -64,17 +64,24 @@ class Task1LM(LightningModule):
         if self.reg_type == "l2" and self.reg_weight > 0:
             sq_sum = torch.tensor(0.0, device=base_loss.device)
             n = 0
-            for p in self.model.parameters():
+            for name, p in self.model.named_parameters():
+                if not p.requires_grad:
+                    continue
+                # opcional: não regularizar bias
+                if name.endswith("bias"):
+                    continue
                 sq_sum = sq_sum + torch.sum(p ** 2)
                 n += p.numel()
-            reg_loss = sq_sum / max(n, 1)  # normaliza pela quantidade de parâmetros
+            reg_loss = sq_sum / max(n, 1)
+
     
         elif self.reg_type == "tv" and self.reg_weight > 0:
             # TV nos logits (ds[0]) -> suaviza o mapa predito
-            logits = ds[0]
-            dx = torch.mean(torch.abs(logits[:, :, :, 1:] - logits[:, :, :, :-1]))
-            dy = torch.mean(torch.abs(logits[:, :, 1:, :] - logits[:, :, :-1, :]))
+            pred = torch.sigmoid(ds[0])
+            dx = torch.mean(torch.abs(pred[:, :, :, 1:] - pred[:, :, :, :-1]))
+            dy = torch.mean(torch.abs(pred[:, :, 1:, :] - pred[:, :, :-1, :]))
             reg_loss = dx + dy
+
     
         # loss final (a que o otimizador minimiza)
         loss = base_loss + self.reg_weight * reg_loss
