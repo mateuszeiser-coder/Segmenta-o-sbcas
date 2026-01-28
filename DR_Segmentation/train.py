@@ -144,12 +144,19 @@ if __name__ == '__main__':
         conf.backbone = 'u2net_full'
     else:
         raise ValueError
-    
-    for seed in [42, 43, 44, 45, 46]:
+    # ====== override de seed APENAS para Colab ======
+    if "SINGLE_SEED" in os.environ:
+        seeds = [int(os.environ["SINGLE_SEED"])]
+    else:
+        seeds = [42, 43, 44, 45, 46]
+# ===============================================
+
+    for seed in seeds:
         conf.seed = seed
         set_seed(conf.seed)
         score = run(conf)
-
+    
         print(f'{conf.seed} Best Dice Similarity Coefficient: {score}')
         with open(os.path.join(conf.save_dir, f'{conf.seed}_performance.txt'), 'w') as f:
             f.write(f'{score}')
+
