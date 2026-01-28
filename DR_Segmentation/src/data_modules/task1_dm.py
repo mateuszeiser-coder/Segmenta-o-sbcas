@@ -61,7 +61,8 @@ class Task1DM(LightningDataModule):
             # A.RandomBrightnessContrast(p=0.3),
             # A.ShiftScaleRotate(p=0.3),
             
-            A.Flip(),
+            A.OneOf([A.HorizontalFlip(p=1.0), A.VerticalFlip(p=1.0),], p=0.5),
+            
             A.ShiftScaleRotate(shift_limit=0.2, rotate_limit=90), # default = A.ShiftScaleRotate()
             A.OneOf([
                 A.RandomBrightnessContrast(p=1),
