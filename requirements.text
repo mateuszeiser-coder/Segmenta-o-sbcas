@@ -1,28 +1,25 @@
-
-# config / utils
-yacs
-pyyaml
-tqdm
+# ===== Core / utils =====
 numpy
 pandas
+tqdm
+pyyaml
+yacs
 
-# imagem
+# ===== Imaging =====
 opencv-python
 Pillow
 scikit-image
 albumentations
 
-# ML
+# ===== ML =====
 scikit-learn
 
-# logging/metrics
+# ===== Training / logging =====
 tensorboard
 torchmetrics==1.3.2
-
-# training framework
 pytorch-lightning==2.2.5
 
-# modelos 
+# ===== Models / segmentation =====
 timm
 einops
 segmentation-models-pytorch
