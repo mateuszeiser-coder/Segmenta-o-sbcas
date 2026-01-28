@@ -114,7 +114,7 @@ def parse_argument():
     parser.add_argument('--lr', type=float, default=2e-4)
     parser.add_argument('--optimizer', type=str, default='adamw', choices=['adam', 'adamw', 'sgd', 'radam'])
     # Regularization
-    parser.add_argument('--reg_type', type=str, default='none', choices=['none', 'l2'])
+    parser.add_argument('--reg_type', type=str, default='none', choices=['none', 'l2','tv'])
     parser.add_argument('--reg_weight', type=float, default=0.0)
 
     
