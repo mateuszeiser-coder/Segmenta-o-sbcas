@@ -7,7 +7,7 @@ import glob
 import torch
 from torch.utils.data import Dataset
 
-# 0909 현재까지 베스트
+
 class Task1Dataset(Dataset):
     def __init__(self, data_dir, split, transform=None, target=2):
         super().__init__()
@@ -117,7 +117,8 @@ class Task1Dataset2(Dataset):
                 assert (np.unique(mask) == [0, 255]).all(), np.unique(mask)
                 lbl.append(mask/255.)
             else:
-                lbl.append(np.zeros((1024, 1024),np.float))
+                lbl.append(np.zeros((1024, 1024), dtype=float))
+
         
         if self.transform is not None:
             aug = self.transform(image=img, mask=lbl[0], mask1=pl_mask)
