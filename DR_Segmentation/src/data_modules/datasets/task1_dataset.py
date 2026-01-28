@@ -56,6 +56,7 @@ class Task1Dataset(Dataset):
             lbl = [torch.as_tensor(m) if not torch.is_tensor(m) else m for m in lbl]
             lbl = [m.float() for m in lbl]
             lbl = torch.stack(lbl)
+            lbl = (lbl > 0).float()
 
         lbl = torch.stack(lbl)
         #print(img.size())
