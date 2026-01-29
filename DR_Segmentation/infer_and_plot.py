@@ -7,7 +7,7 @@ from src.utils import set_seed
 
 
 # ================= CONFIG =================
-DATA_DIR = "/content/drive/MyDrive/A. Segmentation"
+DATA_DIR = "/content/drive/MyDrive"
 INPUT_SIZE = 1024
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
