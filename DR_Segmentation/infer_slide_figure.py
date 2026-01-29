@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from DR_Segmentation.models.model import DRSegModel
+from DR_Segmentation.src.model import DRSegModel
 from DR_Segmentation.data_modules.task1_dataset import Task1Dataset
 
 
