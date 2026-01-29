@@ -1,16 +1,22 @@
+import os
 import torch
 import matplotlib.pyplot as plt
 
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
+from src.data_modules.datasets.task1_dataset import Task1Dataset
 from src.lightning_modules.task1_lm import Task1LM
-from src.data_modules.task1_dm import Task1DM
-from src.utils import set_seed
 
 
-# ================= CONFIG =================
+# ===================== CONFIG =====================
+
+# Pode ser:
+# "/content/drive/MyDrive"
+# ou "/content/drive/MyDrive/A. Segmentation"
 DATA_DIR = "/content/drive/MyDrive"
-INPUT_SIZE = 1024
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+# Caminhos dos checkpoints (ajuste se necessário)
 CKPTS = {
     1: "/content/Segmenta-o-sbcas/outputs_drac/task1/debug/class_1/42_class_1_epoch=00-Dice=0.0000.ckpt",
     2: "/content/Segmenta-o-sbcas/outputs_drac/task1/debug/class_2/42_class_2_epoch=00-Dice=0.6453.ckpt",
@@ -22,76 +28,74 @@ LABELS = {
     2: "Class 2\nNonperfusion\nArea",
     3: "Class 3\nNeovascularization",
 }
-# ==========================================
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+OUT_FIG = "qualitative_result.png"
+
+# ================================================
 
 
-def load_model(ckpt, target):
-    backbone = "u2net_lite" if target in [1, 3] else "u2net_full"
+def load_model(ckpt_path: str) -> Task1LM:
+    """Carrega modelo Lightning a partir de checkpoint"""
     model = Task1LM.load_from_checkpoint(
-        ckpt,
-        lr=1e-4,
-        backbone=backbone,
-        target=target,
-        reg_type="none",
-        reg_weight=0.0,
+        ckpt_path,
+        map_location=DEVICE
     )
-    model.to(DEVICE)
     model.eval()
+    model.to(DEVICE)
     return model
 
 
 def main():
-    set_seed(42)
 
-    # Data (pegamos UMA imagem só)
-    dm = Task1DM(
-        task="segment",
-        data_dir=DATA_DIR,
-        input_size=INPUT_SIZE,
-        batch_size=1,
-        num_workers=2,
-        balanced_sampling=False,
-        target=1,  # irrelevante aqui
-    )
-    dm.setup(stage="test")
-    import albumentations as A
-    from albumentations.pytorch import ToTensorV2
-    
-    dm.test_dataset.transform = A.Compose([
+    # -------- Transform (SEM AUGMENTATION) --------
+    transform = A.Compose([
         A.Resize(1024, 1024),
         A.Normalize(),
         ToTensorV2()
     ])
 
-    batch = next(iter(dm.test_dataloader()))
+    # -------- Dataset --------
+    dataset = Task1Dataset(
+        data_dir=DATA_DIR,
+        split="test",
+        transform=transform
+    )
 
-    image = batch["image"].to(DEVICE)
-    img_np = image[0].permute(1, 2, 0).cpu().numpy()
+    # Pega UMA imagem (qualitativo)
+    img, gt = dataset[0]     # img: (3,H,W), gt: (3,H,W)
+    img = img.to(DEVICE)
 
-    preds = {}
+    # -------- Inferência (uma classe por modelo) --------
+    preds = []
 
-    for cls in [1, 2, 3]:
-        model = load_model(CKPTS[cls], cls)
-        with torch.no_grad():
-            p = torch.sigmoid(model(image))
-            preds[cls] = (p > 0.5).float()[0, 0].cpu().numpy()
+    with torch.no_grad():
+        for cls in [1, 2, 3]:
+            model = load_model(CKPTS[cls])
+            pred = torch.sigmoid(model(img.unsqueeze(0)))[0]  # (C,H,W)
+            preds.append(pred[cls - 1].cpu())
 
-    # ===== Plot =====
-    fig, axs = plt.subplots(1, 4, figsize=(18, 5))
+    # -------- Plot --------
+    img_np = img.cpu().permute(1, 2, 0).numpy()
 
-    axs[0].imshow(img_np)
-    axs[0].set_title("Original Image", fontsize=12)
-    axs[0].axis("off")
+    plt.figure(figsize=(16, 4))
 
-    for i, cls in enumerate([1, 2, 3], start=1):
-        axs[i].imshow(preds[cls], cmap="gray")
-        axs[i].set_title(LABELS[cls], fontsize=12)
-        axs[i].axis("off")
+    plt.subplot(1, 4, 1)
+    plt.imshow(img_np)
+    plt.title("Original Image")
+    plt.axis("off")
 
-    plt.suptitle("Qualitative Result", fontsize=16)
+    for i, cls in enumerate([1, 2, 3]):
+        plt.subplot(1, 4, i + 2)
+        plt.imshow(preds[i], cmap="gray")
+        plt.title(LABELS[cls])
+        plt.axis("off")
+
     plt.tight_layout()
-    plt.savefig("qualitative_result.png", dpi=300)
+    plt.savefig(OUT_FIG, dpi=300)
     plt.show()
+
+    print(f"[OK] Figura salva em: {OUT_FIG}")
 
 
 if __name__ == "__main__":
