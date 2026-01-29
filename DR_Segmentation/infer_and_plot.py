@@ -70,10 +70,18 @@ def main():
     preds = []
 
     with torch.no_grad():
-        for cls in [1, 2, 3]:
-            model = load_model(CKPTS[cls])
-            pred = torch.sigmoid(model(img.unsqueeze(0)))[0]  # (C,H,W)
-            preds.append(pred[cls - 1].cpu())
+    for cls in [1, 2, 3]:
+        model = load_model(CKPTS[cls])
+
+        out = torch.sigmoid(model(img.unsqueeze(0)))[0]
+        # out pode ser (1,H,W) ou (3,H,W)
+
+        if out.shape[0] == 1:
+            # modelo binário (um checkpoint por classe)
+            preds.append(out[0].cpu())
+        else:
+            # modelo multiclasse
+            preds.append(out[cls - 1].cpu())
 
     # -------- Plot --------
     img_np = img.cpu().permute(1, 2, 0).numpy()
