@@ -54,6 +54,15 @@ def main():
         target=1,  # irrelevante aqui
     )
     dm.setup(stage="test")
+    import albumentations as A
+    from albumentations.pytorch import ToTensorV2
+    
+    dm.test_dataset.transform = A.Compose([
+        A.Resize(1024, 1024),
+        A.Normalize(),
+        ToTensorV2()
+    ])
+
     batch = next(iter(dm.test_dataloader()))
 
     image = batch["image"].to(DEVICE)
