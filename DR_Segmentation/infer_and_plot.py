@@ -1,22 +1,15 @@
-import os
 import torch
 import matplotlib.pyplot as plt
-
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-from src.data_modules.datasets.task1_dataset import Task1Dataset
 from src.lightning_modules.task1_lm import Task1LM
+from src.data_modules.datasets.task1_dataset import Task1Dataset
 
 
-# ===================== CONFIG =====================
-
-# Pode ser:
-# "/content/drive/MyDrive"
-# ou "/content/drive/MyDrive/A. Segmentation"
+# ================= CONFIG =================
 DATA_DIR = "/content/drive/MyDrive"
 
-# Caminhos dos checkpoints (ajuste se necessário)
 CKPTS = {
     1: "/content/Segmenta-o-sbcas/outputs_drac/task1/debug/class_1/42_class_1_epoch=00-Dice=0.0000.ckpt",
     2: "/content/Segmenta-o-sbcas/outputs_drac/task1/debug/class_2/42_class_2_epoch=00-Dice=0.6453.ckpt",
@@ -30,63 +23,51 @@ LABELS = {
 }
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-OUT_FIG = "qualitative_result.png"
-
-# ================================================
+# ==========================================
 
 
-def load_model(ckpt_path: str) -> Task1LM:
-    """Carrega modelo Lightning a partir de checkpoint"""
+def load_model(ckpt, target):
+    backbone = "u2net_lite" if target in [1, 3] else "u2net_full"
     model = Task1LM.load_from_checkpoint(
-        ckpt_path,
-        map_location=DEVICE
+        ckpt,
+        lr=1e-4,
+        backbone=backbone,
+        target=target,
+        reg_type="none",
+        reg_weight=0.0,
     )
-    model.eval()
-    model.to(DEVICE)
+    model.eval().to(DEVICE)
     return model
 
 
 def main():
 
-    # -------- Transform (SEM AUGMENTATION) --------
     transform = A.Compose([
         A.Resize(1024, 1024),
         A.Normalize(),
         ToTensorV2()
     ])
 
-    # -------- Dataset --------
     dataset = Task1Dataset(
         data_dir=DATA_DIR,
         split="test",
         transform=transform
     )
 
-    # Pega UMA imagem (qualitativo)
-    img, gt = dataset[0]     # img: (3,H,W), gt: (3,H,W)
-    img = img.to(DEVICE)
+    img, _ = dataset[0]              # (3,H,W)
+    img = img.unsqueeze(0).to(DEVICE)
 
-    # -------- Inferência (uma classe por modelo) --------
     preds = []
 
     with torch.no_grad():
-    for cls in [1, 2, 3]:
-        model = load_model(CKPTS[cls])
+        for cls in [1, 2, 3]:
+            model = load_model(CKPTS[cls], cls)
+            p = torch.sigmoid(model(img))[0, cls - 1]
+            preds.append(p.cpu())
 
-        out = torch.sigmoid(model(img.unsqueeze(0)))[0]
-        # out pode ser (1,H,W) ou (3,H,W)
+    img_np = img[0].cpu().permute(1, 2, 0).numpy()
 
-        if out.shape[0] == 1:
-            # modelo binário (um checkpoint por classe)
-            preds.append(out[0].cpu())
-        else:
-            # modelo multiclasse
-            preds.append(out[cls - 1].cpu())
-
-    # -------- Plot --------
-    img_np = img.cpu().permute(1, 2, 0).numpy()
-
-    plt.figure(figsize=(16, 4))
+    plt.figure(figsize=(18, 5))
 
     plt.subplot(1, 4, 1)
     plt.imshow(img_np)
@@ -99,11 +80,12 @@ def main():
         plt.title(LABELS[cls])
         plt.axis("off")
 
+    plt.suptitle("Qualitative Result", fontsize=16)
     plt.tight_layout()
-    plt.savefig(OUT_FIG, dpi=300)
+    plt.savefig("qualitative_result.png", dpi=300)
     plt.show()
 
-    print(f"[OK] Figura salva em: {OUT_FIG}")
+    print("✔ qualitative_result.png gerado com sucesso")
 
 
 if __name__ == "__main__":
