@@ -1,115 +1,89 @@
-import os
 import torch
-import numpy as np
 import matplotlib.pyplot as plt
-import cv2
+
+from src.lightning_modules.task1_lm import Task1LM
+from src.data_modules.task1_dm import Task1DM
+from src.utils import set_seed
 
 
-from DR_Segmentation.models.model import DRSegModel
-from DR_Segmentation.data_modules.task1_dataset import Task1Dataset
-
-
-# ============================
-# CONFIGURAÇÕES
-# ============================
-
+# ================= CONFIG =================
 DATA_DIR = "/content/drive/MyDrive/A. Segmentation"
-CKPT_PATH = "lightning_logs/version_0/checkpoints/epoch=0-step=XXX.ckpt"
-TARGET = 1               # 1=MA, 2=HE, 3=EX
-OUTPUT_DIR = "paper_figures/target_{}".format(TARGET)
-SAMPLES = [3, 17, 42]    # índices fixos (reprodutibilidade)
+INPUT_SIZE = 1024
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+CKPTS = {
+    1: "/content/Segmenta-o-sbcas/outputs_drac/task1/debug/class_1/42_class_1_epoch=00-Dice=0.0000.ckpt",
+    2: "/content/Segmenta-o-sbcas/outputs_drac/task1/debug/class_2/42_class_2_epoch=00-Dice=0.6453.ckpt",
+    3: "/content/Segmenta-o-sbcas/outputs_drac/task1/debug/class_3/42_class_3_epoch=00-Dice=0.0000.ckpt",
+}
 
-
-# ============================
-# FUNÇÕES AUXILIARES
-# ============================
-
-def overlay_mask(image, mask, color=(255, 0, 0)):
-    """
-    image: HxWx3 uint8
-    mask: HxW float [0,1]
-    """
-    image = image.copy()
-    mask = mask > 0.5
-    overlay = image.copy()
-    overlay[mask] = color
-    return cv2.addWeighted(image, 0.7, overlay, 0.3, 0)
+LABELS = {
+    1: "Class 1\nMicrovascular\nAbnormality",
+    2: "Class 2\nNonperfusion\nArea",
+    3: "Class 3\nNeovascularization",
+}
+# ==========================================
 
 
-# ============================
-# LOAD MODEL
-# ============================
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-model = DRSegModel.load_from_checkpoint(CKPT_PATH)
-model.to(device)
-model.eval()
-
-
-# ============================
-# LOAD DATASET (TEST)
-# ============================
-
-test_ds = Task1Dataset(
-    split="test",
-    data_dir=DATA_DIR,
-    target=TARGET,
-    transform=None
-)
-
-
-# ============================
-# INFERÊNCIA + PLOTS
-# ============================
-
-for idx in SAMPLES:
-    img, gt = test_ds[idx]
-
-    with torch.no_grad():
-        pred = model(img.unsqueeze(0).to(device))
-        pred = torch.sigmoid(pred).cpu().numpy()[0, 0]
-
-    # imagem original (C,H,W -> H,W,C)
-    img_np = (img.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
-    gt_np = gt.numpy()
-
-    overlay_pred = overlay_mask(img_np, pred)
-
-    # ============================
-    # FIGURA (PADRÃO PAPER)
-    # ============================
-
-    plt.figure(figsize=(12, 4))
-
-    plt.subplot(1, 4, 1)
-    plt.title("Original")
-    plt.imshow(img_np)
-    plt.axis("off")
-
-    plt.subplot(1, 4, 2)
-    plt.title("Ground Truth")
-    plt.imshow(gt_np, cmap="gray")
-    plt.axis("off")
-
-    plt.subplot(1, 4, 3)
-    plt.title("Prediction")
-    plt.imshow(pred, cmap="gray")
-    plt.axis("off")
-
-    plt.subplot(1, 4, 4)
-    plt.title("Overlay")
-    plt.imshow(overlay_pred)
-    plt.axis("off")
-
-    out_path = os.path.join(
-        OUTPUT_DIR, f"sample_{idx}_target_{TARGET}.png"
+def load_model(ckpt, target):
+    backbone = "u2net_lite" if target in [1, 3] else "u2net_full"
+    model = Task1LM.load_from_checkpoint(
+        ckpt,
+        lr=1e-4,
+        backbone=backbone,
+        target=target,
+        reg_type="none",
+        reg_weight=0.0,
     )
+    model.to(DEVICE)
+    model.eval()
+    return model
 
+
+def main():
+    set_seed(42)
+
+    # Data (pegamos UMA imagem só)
+    dm = Task1DM(
+        task="segment",
+        data_dir=DATA_DIR,
+        input_size=INPUT_SIZE,
+        batch_size=1,
+        num_workers=2,
+        balanced_sampling=False,
+        target=1,  # irrelevante aqui
+    )
+    dm.setup(stage="test")
+    batch = next(iter(dm.test_dataloader()))
+
+    image = batch["image"].to(DEVICE)
+    img_np = image[0].permute(1, 2, 0).cpu().numpy()
+
+    preds = {}
+
+    for cls in [1, 2, 3]:
+        model = load_model(CKPTS[cls], cls)
+        with torch.no_grad():
+            p = torch.sigmoid(model(image))
+            preds[cls] = (p > 0.5).float()[0, 0].cpu().numpy()
+
+    # ===== Plot =====
+    fig, axs = plt.subplots(1, 4, figsize=(18, 5))
+
+    axs[0].imshow(img_np)
+    axs[0].set_title("Original Image", fontsize=12)
+    axs[0].axis("off")
+
+    for i, cls in enumerate([1, 2, 3], start=1):
+        axs[i].imshow(preds[cls], cmap="gray")
+        axs[i].set_title(LABELS[cls], fontsize=12)
+        axs[i].axis("off")
+
+    plt.suptitle("Qualitative Result", fontsize=16)
     plt.tight_layout()
-    plt.savefig(out_path, dpi=300)
-    plt.close()
+    plt.savefig("qualitative_result.png", dpi=300)
+    plt.show()
 
-    print(f"[OK] Saved: {out_path}")
+
+if __name__ == "__main__":
+    main()
